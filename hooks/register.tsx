@@ -64,7 +64,7 @@ export const register: Register = on => {
         return { text: HELP }
       case 'play': {
         const list = await loadPlaylist($)
-        if (list.length === 0) return { text: emptyPlaylist($) }
+        if (list.length === 0) return { text: emptyPlaylist() }
         const n = arg ? Number(arg) - 1 : (await read($, player)).index
         void play($, Number.isInteger(n) && n >= 0 && n < list.length ? n : 0)
         await $.ui.open({ id: PANE, title: '♪ Pixel Player' })
@@ -82,7 +82,7 @@ export const register: Register = on => {
       }
       case 'add': {
         if (!arg) return { text: 'Usage: /music add <url or file>' }
-        const path = `${$.plugin.root}/playlist.txt`
+        const path = await playlistPath($)
         const old = (await $.fs.exists(path)) ? await $.fs.read(path) : ''
         await $.fs.write(path, `${old}${old.endsWith('\n') || old === '' ? '' : '\n'}${arg}\n`)
         const list = await loadPlaylist($)
@@ -178,15 +178,30 @@ export const register: Register = on => {
   })
 }
 
+// Kept outside the plugin folder: an installed plugin's folder is a copy that an update replaces.
+async function playlistPath($: $): Promise<string> {
+  const home = (await $.env.get('HOME')) ?? ''
+  const path = `${home}/.claude/pixel-play/playlist.txt`
+  if (!(await $.fs.exists(path))) {
+    const legacy = `${$.plugin.root}/playlist.txt`
+    const start = (await $.fs.exists(legacy))
+      ? await $.fs.read(legacy)
+      : '# One track per line: a YouTube link, a direct audio URL, or a local file path.\n' +
+        '# Anything after " # " on a line is a title shown until the real one loads.\n'
+    await $.fs.write(path, start)
+  }
+  return path
+}
+
 async function loadPlaylist($: $): Promise<Track[]> {
-  const path = `${$.plugin.root}/playlist.txt`
+  const path = await playlistPath($)
   const list = (await $.fs.exists(path)) ? parsePlaylist(await $.fs.read(path)) : []
   await update($, playlist, () => list)
   return list
 }
 
-function emptyPlaylist($: $): string {
-  return `playlist.txt is empty. Add a line with /music add <youtube link>, or edit ${$.plugin.root}/playlist.txt`
+function emptyPlaylist(): string {
+  return 'The playlist is empty. Add a line with /music add <youtube link>, or edit ~/.claude/pixel-play/playlist.txt'
 }
 
 async function which($: $, name: string): Promise<string | undefined> {
@@ -288,7 +303,7 @@ async function stop($: $): Promise<void> {
 
 async function step($: $, delta: number): Promise<string> {
   const list = await read($, playlist)
-  if (list.length === 0) return emptyPlaylist($)
+  if (list.length === 0) return emptyPlaylist()
   const p = await read($, player)
   const n = (p.index + delta + list.length) % list.length
   void play($, n)

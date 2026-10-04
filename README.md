@@ -27,10 +27,16 @@ It is a Claude Code mod (a plugin of function hooks). Playback goes through [mpv
 
 ## Install
 
+The repository is its own plugin marketplace:
+
 ```sh
-git clone https://github.com/chrisluo5311/Pixel-Play.git
-claude --plugin-dir ./Pixel-Play
+claude plugin marketplace add chrisluo5311/Pixel-Play
+claude plugin install pixel-player@pixel-play
 ```
+
+Restart Claude Code (or run `/reload-plugins`) and `/music` is available in every session. Update later with `claude plugin marketplace update pixel-play && claude plugin update pixel-player@pixel-play`.
+
+To try it without installing: `git clone https://github.com/chrisluo5311/Pixel-Play.git && claude --plugin-dir ./Pixel-Play`.
 
 Then add some tracks and start playing:
 
@@ -39,7 +45,7 @@ Then add some tracks and start playing:
 /music play
 ```
 
-Your playlist lives in `playlist.txt` in the plugin folder. It is git-ignored; `playlist.example.txt` shows the format.
+Your playlist lives in `~/.claude/pixel-play/playlist.txt`, outside the plugin folder, so updates never touch it. `playlist.example.txt` shows the format.
 
 ## Commands
 
@@ -50,7 +56,7 @@ Your playlist lives in `playlist.txt` in the plugin folder. It is git-ignored; `
 | `/music stop` | Stop |
 | `/music next` / `/music prev` | Skip forward or back |
 | `/music add <url>` | Append a YouTube link, direct audio URL or local file |
-| `/music reload` | Re-read `playlist.txt` after editing it by hand |
+| `/music reload` | Re-read the playlist after editing it by hand |
 | `/music skins` | List the skins |
 | `/music skin [name or number]` | Switch skin (no argument: next skin) |
 | `/music vol <0-100>` | Set the volume |

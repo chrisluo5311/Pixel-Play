@@ -1,0 +1,14 @@
+{
+  "name": "pixel-play",
+  "description": "Pixel Play: a pixel-art music player for Claude Code",
+  "owner": {
+    "name": "chrisluo5311"
+  },
+  "plugins": [
+    {
+      "name": "pixel-player",
+      "source": "./",
+      "description": "A pixel-art music player pane that streams a playlist through mpv"
+    }
+  ]
+}
