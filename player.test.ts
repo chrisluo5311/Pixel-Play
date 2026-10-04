@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { equalizer, formatTime, parsePlaylist, parseProgress, progressBar } from './hooks/player'
+import { equalizer, formatTime, ipcCommand, ipcSucceeded, parsePlaylist, parseProgress, progressBar } from './hooks/player'
 import { rasterize } from './hooks/pixel'
 import { SKINS } from './hooks/skins.gen'
 
@@ -22,12 +22,21 @@ test('playlist.txt: comments skipped, optional titles kept', () => {
 })
 
 test('progress lines from mpv/progress.lua', () => {
-  expect(parseProgress('noise\n@@pos|1.0|200.5|A\n@@pos|2.0|200.5|Song | Live\n')).toEqual({
+  expect(parseProgress('noise\n@@pos|1.0|200.5|0|A\n@@pos|2.0|200.5|1|Song | Live\n')).toEqual({
     position: 2,
     duration: 200.5,
+    paused: true,
     title: 'Song | Live',
   })
+  expect(parseProgress('@@pos|2.0|-1.0|0|Radio')?.paused).toBe(false)
   expect(parseProgress('nothing here')).toBe(undefined)
+})
+
+test('mpv IPC lines and replies', () => {
+  expect(ipcCommand('set_property', 'pause', true)).toBe('{"command":["set_property","pause",true]}\n')
+  expect(ipcSucceeded('{"request_id":0,"error":"success"}\n')).toBe(true)
+  expect(ipcSucceeded('{"request_id":0,"error":"property not found"}\n')).toBe(false)
+  expect(ipcSucceeded('')).toBe(false)
 })
 
 test('time, bar and equalizer formatting', () => {
@@ -97,3 +106,94 @@ for (const bodyColumns of [44, 24]) {
     expect(await ui.find({ type: 'Text', text: /Nothing queued/ })).toBeDefined()
   })
 }
+
+// A fake mpv: it reports progress every mocked second and takes pause/resume over "IPC".
+function fakeMpv(on: Parameters<Parameters<typeof test>[1]>[1], options: { ipcWorks: boolean }) {
+  mock.store(on)
+  mock.env(on, { HOME: '/home/me', TMPDIR: '/tmp/' })
+  const clock = mock.clock(on)
+  const sent: string[] = []
+  let paused = 0
+  on('ui.open', async () => ({ value: undefined }))
+  on('ui.status', async () => ({ value: undefined }))
+  on('fs.exists', async () => ({ value: true }))
+  on('fs.read', async () => ({ value: 'https://youtu.be/abc # Song\n' }))
+  on('fs.write', async () => ({ value: undefined }))
+  on('process.run', async ($, e) => {
+    const stdin = e.init?.stdin ?? ''
+    sent.push(`${e.argv.join(' ')} <- ${stdin.trim()}`)
+    if (!options.ipcWorks) {
+      return { value: { exitCode: 1, stdout: '', stderr: 'refused', isStdoutTruncated: false, isStderrTruncated: false } }
+    }
+    if (stdin.includes('"pause",true')) paused = 1
+    if (stdin.includes('"pause",false')) paused = 0
+    const stdout = '{"request_id":0,"error":"success"}\n'
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('process.spawn', async function* ($, e, next) {
+    sent.push(e.argv.find(a => a.startsWith('--input-ipc-server=')) ?? 'no ipc server')
+    while (!next.signal.aborted) {
+      yield { stream: 'stdout' as const, text: `@@pos|3.0|100.0|${paused}|Song\n` }
+      // Asleep on the mocked clock, so the test moves time; a kill wakes it.
+      await Promise.race([clock.sleep(1000), new Promise(r => next.signal.addEventListener('abort', r))])
+    }
+    return { value: { code: null, signal: 'SIGTERM' } }
+  })
+  return { clock, sent }
+}
+
+const runMusic = ($: Parameters<Parameters<typeof test>[1]>[0]) => async (args: string) =>
+  (
+    (await $.command.run({
+      command: 'music',
+      args,
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: true, columns: 160 },
+    })) as { text?: string }
+  ).text
+
+test('/music pause pauses mpv over IPC, and pause or play resumes it', async ($, on) => {
+  const { clock, sent } = fakeMpv(on, { ipcWorks: true })
+  const music = runMusic($)
+
+  expect(await music('pause')).toBe('Nothing is playing.')
+  expect(await music('play')).toBe('Playing track 1.')
+  await clock.advance(10)
+  expect(sent[0]).toMatch(/^--input-ipc-server=\/tmp\/pixel-play-\w+\.sock$/)
+
+  expect(await music('pause')).toBe('Paused at 00:03.')
+  expect(sent[1]).toBe(`/usr/bin/nc -U ${sent[0]!.split('=')[1]} <- {"command":["set_property","pause",true]}`)
+  // mpv's next report agrees, and the pane shows it.
+  await clock.advance(1000)
+  const ui = await $.ui.mount({
+    plugin: 'pixel-player',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'pixel-player',
+    props: { title: '♪', isFocused: true, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+  })
+  expect(await ui.find({ type: 'Text', text: /⏸ Song/ })).toBeDefined()
+  expect(await music('pause')).toBe('Resumed.')
+  expect(await music('resume')).toBe('Nothing is paused.')
+
+  // The pane's play button toggles: pause, then play resumes the same track.
+  await ui.press({ key: 'play' })
+  expect(sent.at(-1)).toMatch(/"pause",true/)
+  expect(await music('play')).toBe('Resumed.')
+  expect(sent.at(-1)).toMatch(/"pause",false/)
+  // Only one mpv was ever started.
+  expect(sent.filter(s => s.startsWith('--input-ipc-server')).length).toBe(1)
+
+  expect(await music('stop')).toBe('Stopped.')
+  expect(await music('pause')).toBe('Nothing is playing.')
+  await ui.unmount()
+})
+
+test('/music pause says so when mpv cannot be reached', async ($, on) => {
+  const { clock } = fakeMpv(on, { ipcWorks: false })
+  const music = runMusic($)
+  await music('play')
+  await clock.advance(10)
+  expect(await music('pause')).toBe('Could not reach mpv to pause.')
+  expect(await music('stop')).toBe('Stopped.')
+})

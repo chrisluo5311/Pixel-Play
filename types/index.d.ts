@@ -1,6 +1,6 @@
 export type Track = { url: string; title?: string }
 
-export type PlayerStatus = 'stopped' | 'loading' | 'playing' | 'error'
+export type PlayerStatus = 'stopped' | 'loading' | 'playing' | 'paused' | 'error'
 
 export type Player = {
   status: PlayerStatus

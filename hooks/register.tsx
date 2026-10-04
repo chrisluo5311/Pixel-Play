@@ -3,7 +3,16 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Player, Track } from '../types'
 import { PixelArt } from './pixel'
-import { equalizer, formatTime, parsePlaylist, parseProgress, progressBar, trackLabel } from './player'
+import {
+  equalizer,
+  formatTime,
+  ipcCommand,
+  ipcSucceeded,
+  parsePlaylist,
+  parseProgress,
+  progressBar,
+  trackLabel,
+} from './player'
 import { SKINS } from './skins.gen'
 
 const PANE = 'pixel-player'
@@ -21,6 +30,8 @@ const volume = atom({ plugin: 'pixel-player', key: 'volume' } as const, 60)
 const HELP = [
   '/music              open the player pane',
   '/music play [n]     play the playlist (from track n)',
+  '/music pause        pause, or resume when paused',
+  '/music resume       resume a paused track',
   '/music stop | next | prev',
   '/music add <url>    append a YouTube link, audio URL or file to playlist.txt',
   '/music reload       re-read playlist.txt',
@@ -34,6 +45,9 @@ let stream: AsyncGenerator<unknown, unknown> | undefined
 let generation = 0
 let ticker: { cancel: () => void } | undefined
 let titles: Record<string, string> = {}
+// mpv's JSON IPC socket for the running child; one name per module load.
+let socket: string | undefined
+const SOCKET_ID = Math.random().toString(36).slice(2, 8)
 
 type $ = EngineInterface
 
@@ -63,6 +77,7 @@ export const register: Register = on => {
       case 'help':
         return { text: HELP }
       case 'play': {
+        if (!arg && (await read($, player)).status === 'paused') return { text: await resume($) }
         const list = await loadPlaylist($)
         if (list.length === 0) return { text: emptyPlaylist() }
         const n = arg ? Number(arg) - 1 : (await read($, player)).index
@@ -70,6 +85,10 @@ export const register: Register = on => {
         await $.ui.open({ id: PANE, title: '♪ Pixel Player' })
         return { text: `Playing track ${(Number.isInteger(n) && n >= 0 && n < list.length ? n : 0) + 1}.` }
       }
+      case 'pause':
+        return { text: (await read($, player)).status === 'paused' ? await resume($) : await pause($) }
+      case 'resume':
+        return { text: await resume($) }
       case 'stop':
         await stop($)
         return { text: 'Stopped.' }
@@ -120,7 +139,7 @@ export const register: Register = on => {
     const vol = await read($, volume)
     const isPlaying = p.status === 'playing'
     const title = p.title || trackLabel(list[p.index], titles) || 'Nothing queued'
-    const icon = { stopped: '■', loading: '…', playing: '▶', error: '!' }[p.status]
+    const icon = { stopped: '■', loading: '…', playing: '▶', paused: '⏸', error: '!' }[p.status]
     const barWidth = Math.max(4, width - 16)
 
     return (
@@ -146,7 +165,12 @@ export const register: Register = on => {
         )}
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
           <Button key="prev" hotkey="b" label="⏮" onPress={() => step($, -1)} />
-          <Button key="play" hotkey="p" label="▶" onPress={() => play($, p.index)} />
+          <Button
+            key="play"
+            hotkey="p"
+            label={isPlaying ? '⏸' : '▶'}
+            onPress={() => (isPlaying ? pause($) : p.status === 'paused' ? resume($) : play($, p.index))}
+          />
           <Button key="stop" hotkey="s" label="■" onPress={() => stop($)} />
           <Button key="next" hotkey="n" label="⏭" onPress={() => step($, 1)} />
         </Box>
@@ -174,6 +198,7 @@ export const register: Register = on => {
 
   on('session.end', async ($, e, next) => {
     await stop($)
+    if (socket) await $.process.run(['/bin/rm', '-f', socket]).catch(() => undefined)
     return next(e)
   })
 }
@@ -224,6 +249,7 @@ async function play($: $, index: number): Promise<void> {
     return
   }
   const ytdlp = await which($, 'yt-dlp')
+  socket = await socketPath($)
   const vol = await read($, volume)
   await update($, player, () => ({ status: 'loading', index, title: trackLabel(track, titles), position: -1, duration: -1 }))
   $.ui.status(`♪ ${trackLabel(track, titles)}`)
@@ -235,6 +261,7 @@ async function play($: $, index: number): Promise<void> {
     '--really-quiet',
     `--volume=${vol}`,
     `--script=${$.plugin.root}/mpv/progress.lua`,
+    `--input-ipc-server=${socket}`,
     '--ytdl-format=bestaudio/best',
     ...(ytdlp ? [`--script-opts=ytdl_hook-ytdl_path=${ytdlp}`] : []),
     track.url,
@@ -258,7 +285,7 @@ async function play($: $, index: number): Promise<void> {
         $.ui.status(`♪ ${progress.title}`)
       }
       await update($, player, () => ({
-        status: 'playing',
+        status: progress.paused ? 'paused' : 'playing',
         index,
         title: titles[track.url] ?? progress.title,
         position: progress.position,
@@ -299,6 +326,41 @@ async function stop($: $): Promise<void> {
   const p = await read($, player)
   await update($, player, () => ({ ...STOPPED, index: p.index, title: p.title }))
   endTicker($)
+}
+
+// Short enough for a Unix socket path (104 bytes on macOS).
+async function socketPath($: $): Promise<string> {
+  const tmp = ((await $.env.get('TMPDIR')) || '/tmp').replace(/\/+$/, '')
+  return `${tmp}/pixel-play-${SOCKET_ID}.sock`
+}
+
+/** Sends commands to the running mpv over its IPC socket; true when it took them. */
+async function mpvCommand($: $, ...commands: unknown[][]): Promise<boolean> {
+  if (!socket || !stream) return false
+  const result = await $.process
+    .run(['/usr/bin/nc', '-U', socket], { stdin: commands.map(c => ipcCommand(...c)).join(''), timeoutMs: 3000 })
+    .catch(() => undefined)
+  return result?.exitCode === 0 && ipcSucceeded(result.stdout)
+}
+
+async function pause($: $): Promise<string> {
+  const p = await read($, player)
+  if (p.status !== 'playing') return p.status === 'paused' ? 'Already paused.' : 'Nothing is playing.'
+  if (!(await mpvCommand($, ['set_property', 'pause', true]))) return 'Could not reach mpv to pause.'
+  await update($, player, q => ({ ...q, status: 'paused' }))
+  endTicker($)
+  $.ui.status(`⏸ ${p.title}`)
+  return `Paused at ${formatTime(p.position)}.`
+}
+
+async function resume($: $): Promise<string> {
+  const p = await read($, player)
+  if (p.status !== 'paused') return 'Nothing is paused.'
+  if (!(await mpvCommand($, ['set_property', 'pause', false]))) return 'Could not reach mpv to resume.'
+  await update($, player, q => ({ ...q, status: 'playing' }))
+  startTicker($)
+  $.ui.status(`♪ ${p.title}`)
+  return 'Resumed.'
 }
 
 async function step($: $, delta: number): Promise<string> {

@@ -14,16 +14,27 @@ export function parsePlaylist(text: string): Track[] {
   return tracks
 }
 
-export type Progress = { position: number; duration: number; title: string }
+export type Progress = { position: number; duration: number; paused: boolean; title: string }
 
-/** Pulls the last `@@pos|<pos>|<dur>|<title>` line that mpv/progress.lua wrote. */
+/** Pulls the last `@@pos|<pos>|<dur>|<paused 0/1>|<title>` line that mpv/progress.lua wrote. */
 export function parseProgress(chunk: string): Progress | undefined {
   let found: Progress | undefined
   for (const line of chunk.split('\n')) {
-    const m = /^@@pos\|(-?[\d.]+)\|(-?[\d.]+)\|(.*)$/.exec(line.trim())
-    if (m) found = { position: Number(m[1]), duration: Number(m[2]), title: m[3] ?? '' }
+    const m = /^@@pos\|(-?[\d.]+)\|(-?[\d.]+)\|([01])\|(.*)$/.exec(line.trim())
+    if (m) found = { position: Number(m[1]), duration: Number(m[2]), paused: m[3] === '1', title: m[4] ?? '' }
   }
   return found
+}
+
+/** One line of mpv's JSON IPC protocol. */
+export function ipcCommand(...command: unknown[]): string {
+  return `${JSON.stringify({ command })}\n`
+}
+
+/** Whether mpv answered every command it was sent with success. */
+export function ipcSucceeded(reply: string): boolean {
+  const lines = reply.split('\n').filter(l => l.includes('"error"'))
+  return lines.length > 0 && lines.every(l => l.includes('"error":"success"'))
 }
 
 export function formatTime(seconds: number): string {

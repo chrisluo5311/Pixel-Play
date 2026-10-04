@@ -15,7 +15,7 @@ A pixel-art music player for Claude Code. It docks as a pane beside the conversa
 └──────────────────────────────────┘└───────────────────────────┘
 ```
 
-It is a Claude Code mod (a plugin of function hooks). Playback goes through [mpv](https://mpv.io), which streams YouTube links with [yt-dlp](https://github.com/yt-dlp/yt-dlp) without downloading the whole file first.
+It is a Claude Code mod (a plugin of function hooks). Playback goes through [mpv](https://mpv.io), controlled over its IPC socket, which streams YouTube links with [yt-dlp](https://github.com/yt-dlp/yt-dlp) without downloading the whole file first.
 
 ## Requirements
 
@@ -53,6 +53,8 @@ Your playlist lives in `~/.claude/pixel-play/playlist.txt`, outside the plugin f
 | --- | --- |
 | `/music` | Open the player pane |
 | `/music play [n]` | Play the playlist, optionally from track n |
+| `/music pause` | Pause, or resume when paused |
+| `/music resume` | Resume a paused track (`/music play` with no number also resumes) |
 | `/music stop` | Stop |
 | `/music next` / `/music prev` | Skip forward or back |
 | `/music add <url>` | Append a YouTube link, direct audio URL or local file |
@@ -61,7 +63,7 @@ Your playlist lives in `~/.claude/pixel-play/playlist.txt`, outside the plugin f
 | `/music skin [name or number]` | Switch skin (no argument: next skin) |
 | `/music vol <0-100>` | Set the volume |
 
-With the pane focused: `p` play, `s` stop, `n` next, `b` previous, `k` next skin, `u` / `d` volume up / down. Click a track in the playlist to play it.
+With the pane focused: `p` play / pause / resume, `s` stop, `n` next, `b` previous, `k` next skin, `u` / `d` volume up / down. Click a track in the playlist to play it.
 
 ## Playlist format
 
@@ -89,7 +91,6 @@ node scripts/png2sprite.mjs
 ## Known limitations
 
 - The volume applies from the next track on; the running mpv process is not controlled live yet.
-- There is no pause, only stop. Playing again starts the track from the beginning.
 - The equalizer is decorative; it is not driven by the audio.
 - Streaming YouTube audio with yt-dlp may conflict with YouTube's Terms of Service. Use it for your own listening, at your own discretion.
 
