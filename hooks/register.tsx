@@ -144,41 +144,44 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        {sprite && (
-          <PixelArt Box={Box} Text={Text} sprite={sprite} frame={isPlaying ? tick : 0} maxColumns={width} />
-        )}
-        <Text> </Text>
-        <Text bold wrap="truncate">
-          {icon} {title}
-        </Text>
-        <Text wrap="truncate">
-          <Text color="cyan">{progressBar(p.position, p.duration, barWidth)}</Text>{' '}
-          <Text dimColor>
-            {formatTime(p.position)}/{formatTime(p.duration)}
+        {/* The player is centered under the picture; the playlist reads from the left. */}
+        <Box flexDirection="column" alignItems="center">
+          {sprite && (
+            <PixelArt Box={Box} Text={Text} sprite={sprite} frame={isPlaying ? tick : 0} maxColumns={width} />
+          )}
+          <Text> </Text>
+          <Text bold wrap="truncate">
+            {icon} {title}
           </Text>
-        </Text>
-        <Text color="magenta">{equalizer(tick, Math.min(width, 24), isPlaying)}</Text>
-        {p.status === 'error' && p.message && (
-          <Text color="red" wrap="truncate">
-            {p.message}
+          <Text wrap="truncate">
+            <Text color="cyan">{progressBar(p.position, p.duration, barWidth)}</Text>{' '}
+            <Text dimColor>
+              {formatTime(p.position)}/{formatTime(p.duration)}
+            </Text>
           </Text>
-        )}
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          <Button key="prev" hotkey="b" label="⏮" onPress={() => step($, -1)} />
-          <Button
-            key="play"
-            hotkey="p"
-            label={isPlaying ? '⏸' : '▶'}
-            onPress={() => (isPlaying ? pause($) : p.status === 'paused' ? resume($) : play($, p.index))}
-          />
-          <Button key="stop" hotkey="s" label="■" onPress={() => stop($)} />
-          <Button key="next" hotkey="n" label="⏭" onPress={() => step($, 1)} />
-        </Box>
-        <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          <Button key="voldown" hotkey="d" label="vol-" dimColor onPress={() => setVolume($, vol - 10)} />
-          <Text dimColor>{vol}</Text>
-          <Button key="volup" hotkey="u" label="vol+" dimColor onPress={() => setVolume($, vol + 10)} />
-          <Button key="skin" hotkey="k" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
+          <Text color="magenta">{equalizer(tick, Math.min(width, 24), isPlaying)}</Text>
+          {p.status === 'error' && p.message && (
+            <Text color="red" wrap="truncate">
+              {p.message}
+            </Text>
+          )}
+          <Box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+            <Button key="prev" hotkey="b" label="⏮" onPress={() => step($, -1)} />
+            <Button
+              key="play"
+              hotkey="p"
+              label={isPlaying ? '⏸' : '▶'}
+              onPress={() => (isPlaying ? pause($) : p.status === 'paused' ? resume($) : play($, p.index))}
+            />
+            <Button key="stop" hotkey="s" label="■" onPress={() => stop($)} />
+            <Button key="next" hotkey="n" label="⏭" onPress={() => step($, 1)} />
+          </Box>
+          <Box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
+            <Button key="voldown" hotkey="d" label="vol-" dimColor onPress={() => setVolume($, vol - 10)} />
+            <Text dimColor>{vol}</Text>
+            <Button key="volup" hotkey="u" label="vol+" dimColor onPress={() => setVolume($, vol + 10)} />
+            <Button key="skin" hotkey="k" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
+          </Box>
         </Box>
         <Text> </Text>
         <Text dimColor>─ Playlist ({list.length}) ─</Text>

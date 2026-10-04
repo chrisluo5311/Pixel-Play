@@ -173,10 +173,12 @@ test('/music pause pauses mpv over IPC, and pause or play resumes it', async ($,
     props: { title: '♪', isFocused: true, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
   })
   expect(await ui.find({ type: 'Text', text: /⏸ Song/ })).toBeDefined()
+  expect((await ui.find({ key: 'play' }))?.text).toBe('▶')
   expect(await music('pause')).toBe('Resumed.')
   expect(await music('resume')).toBe('Nothing is paused.')
 
   // The pane's play button toggles: pause, then play resumes the same track.
+  expect((await ui.find({ key: 'play' }))?.text).toBe('⏸')
   await ui.press({ key: 'play' })
   expect(sent.at(-1)).toMatch(/"pause",true/)
   expect(await music('play')).toBe('Resumed.')
