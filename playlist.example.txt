@@ -1,0 +1,2 @@
+# One track per line: a YouTube link, a direct audio URL, or a local file path.
+# Anything after " # " on a line is a title shown until the real one loads.

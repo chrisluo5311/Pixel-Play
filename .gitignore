@@ -1,0 +1,8 @@
+# Laid by Claude Code when the mod loads
+.claude-plugin/types/
+
+# Your own playlist (start from playlist.example.txt)
+playlist.txt
+
+node_modules/
+.DS_Store

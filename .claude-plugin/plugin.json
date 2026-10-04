@@ -1,0 +1,6 @@
+{
+  "name": "pixel-player",
+  "version": "0.1.0",
+  "description": "A pixel-art music player pane that streams a playlist through mpv",
+  "types": "./types/index.d.ts"
+}
