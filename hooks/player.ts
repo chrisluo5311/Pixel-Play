@@ -69,6 +69,50 @@ export function equalizer(tick: number, width: number, isPlaying: boolean): stri
   return s
 }
 
+// East Asian wide and fullwidth ranges, plus emoji: each takes two terminal cells.
+const WIDE: Array<[number, number]> = [
+  [0x1100, 0x115f],
+  [0x2e80, 0x303e],
+  [0x3041, 0x33ff],
+  [0x3400, 0x4dbf],
+  [0x4e00, 0x9fff],
+  [0xa000, 0xa4cf],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe30, 0xfe4f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x1f300, 0x1f64f],
+  [0x1f900, 0x1f9ff],
+  [0x20000, 0x3fffd],
+]
+
+function charWidth(ch: string): number {
+  const code = ch.codePointAt(0) ?? 0
+  return WIDE.some(([lo, hi]) => code >= lo && code <= hi) ? 2 : 1
+}
+
+/** How many terminal cells the text takes. */
+export function displayWidth(text: string): number {
+  let w = 0
+  for (const ch of text) w += charWidth(ch)
+  return w
+}
+
+/** Cuts the text to at most `width` cells, ending in … when cut. */
+export function truncateToWidth(text: string, width: number): string {
+  if (displayWidth(text) <= width) return text
+  let out = ''
+  let w = 0
+  for (const ch of text) {
+    const cw = charWidth(ch)
+    if (w + cw > width - 1) break
+    out += ch
+    w += cw
+  }
+  return `${out}…`
+}
+
 export function trackLabel(track: Track | undefined, titles: Record<string, string>): string {
   if (!track) return ''
   return titles[track.url] ?? track.title ?? shortUrl(track.url)

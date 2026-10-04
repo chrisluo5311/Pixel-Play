@@ -12,6 +12,7 @@ import {
   parseProgress,
   progressBar,
   trackLabel,
+  truncateToWidth,
 } from './player'
 import { SKINS } from './skins.gen'
 
@@ -186,12 +187,13 @@ export const register: Register = on => {
         <Text> </Text>
         <Text dimColor>─ Playlist ({list.length}) ─</Text>
         {list.length === 0 && <Text dimColor>Empty. /music add &lt;youtube link&gt;</Text>}
+        {/* One cell short of the edge: a wide character in the last column wraps on some terminals. */}
         {list.map((track, i) => (
           <Button
             key={`t${i}`}
             plain
             dimColor={i !== p.index}
-            label={`${i === p.index ? '▸' : ' '} ${i + 1}. ${trackLabel(track, titles)}`.slice(0, width)}
+            label={truncateToWidth(`${i === p.index ? '▸' : ' '} ${i + 1}. ${trackLabel(track, titles)}`, width - 1)}
             onPress={() => play($, i)}
           />
         ))}

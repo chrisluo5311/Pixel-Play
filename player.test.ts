@@ -1,6 +1,16 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { equalizer, formatTime, ipcCommand, ipcSucceeded, parsePlaylist, parseProgress, progressBar } from './hooks/player'
+import {
+  displayWidth,
+  equalizer,
+  formatTime,
+  ipcCommand,
+  ipcSucceeded,
+  parsePlaylist,
+  parseProgress,
+  progressBar,
+  truncateToWidth,
+} from './hooks/player'
 import { rasterize } from './hooks/pixel'
 import { SKINS } from './hooks/skins.gen'
 
@@ -30,6 +40,18 @@ test('progress lines from mpv/progress.lua', () => {
   })
   expect(parseProgress('@@pos|2.0|-1.0|0|Radio')?.paused).toBe(false)
   expect(parseProgress('nothing here')).toBe(undefined)
+})
+
+test('labels are cut by terminal cells, wide characters counting two', () => {
+  const title = '▸ 1. 【MAD/60fps】戀如雨止【愛在雨過天晴時】'
+  expect(displayWidth(title)).toBe(44)
+  expect(truncateToWidth(title, 44)).toBe(title)
+  const cut = truncateToWidth(title, 20)
+  expect(cut).toBe('▸ 1. 【MAD/60fps】…')
+  expect(displayWidth(cut) <= 20).toBe(true)
+  // A wide character that would straddle the edge is dropped whole.
+  expect(truncateToWidth('戀如雨止', 4)).toBe('戀…')
+  expect(truncateToWidth('abc', 3)).toBe('abc')
 })
 
 test('mpv IPC lines and replies', () => {
