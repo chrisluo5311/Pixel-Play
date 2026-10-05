@@ -58,14 +58,9 @@ type $ = EngineInterface
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'music', description: 'Pixel-art music player: play, stop, next, skin, vol' })
-    titles = ((await $.store.get('titles')) as Record<string, string> | undefined) ?? {}
-    const savedSkin = await $.store.get('skin')
-    if (typeof savedSkin === 'string' && SKINS.some(s => s.id === savedSkin)) await update($, skin, () => savedSkin)
-    const savedVolume = await $.store.get('volume')
-    if (typeof savedVolume === 'number') await update($, volume, () => savedVolume)
+    await restoreState($)
     // Whatever was playing before a reload is gone with the old module.
     await update($, player, () => STOPPED)
-    await loadPlaylist($).catch(() => undefined)
 
     return next(e)
   })
@@ -237,10 +232,29 @@ export const register: Register = on => {
   })
 
   on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') {
+      // /clear goes on under a new session whose state starts empty, and no
+      // session.start fires for it: keep the music and carry the state over.
+      const p = await read($, player)
+      const ended = await next(e)
+      await restoreState($)
+      await update($, player, () => p)
+      return ended
+    }
     await stop($)
     if (socket) await $.process.run(['/bin/rm', '-f', socket]).catch(() => undefined)
     return next(e)
   })
+}
+
+/** Fills the session's state from what is kept across sessions: titles, skin, volume, playlist. */
+async function restoreState($: $): Promise<void> {
+  titles = ((await $.store.get('titles')) as Record<string, string> | undefined) ?? {}
+  const savedSkin = await $.store.get('skin')
+  if (typeof savedSkin === 'string' && SKINS.some(s => s.id === savedSkin)) await update($, skin, () => savedSkin)
+  const savedVolume = await $.store.get('volume')
+  if (typeof savedVolume === 'number') await update($, volume, () => savedVolume)
+  await loadPlaylist($).catch(() => undefined)
 }
 
 // Asks for a dock sized to the terminal, and a short block when it sits inline above the prompt.

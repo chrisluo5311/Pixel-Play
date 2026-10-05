@@ -150,11 +150,15 @@ function fakeMpv(on: Parameters<Parameters<typeof test>[1]>[1], options: { ipcWo
   mock.env(on, { HOME: '/home/me', TMPDIR: '/tmp/' })
   const clock = mock.clock(on)
   const sent: string[] = []
+  const reads = { count: 0 }
   let paused = 0
   on('ui.open', async () => ({ value: undefined }))
   on('ui.status', async () => ({ value: undefined }))
   on('fs.exists', async () => ({ value: true }))
-  on('fs.read', async () => ({ value: 'https://youtu.be/abc # Song\n' }))
+  on('fs.read', async () => {
+    reads.count++
+    return { value: 'https://youtu.be/abc # Song\n' }
+  })
   on('fs.write', async () => ({ value: undefined }))
   on('process.run', async ($, e) => {
     const stdin = e.init?.stdin ?? ''
@@ -176,7 +180,7 @@ function fakeMpv(on: Parameters<Parameters<typeof test>[1]>[1], options: { ipcWo
     }
     return { value: { code: null, signal: 'SIGTERM' } }
   })
-  return { clock, sent }
+  return { clock, sent, reads }
 }
 
 const runMusic = ($: Parameters<Parameters<typeof test>[1]>[0]) => async (args: string) =>
@@ -271,4 +275,21 @@ test('inline above the prompt, the sprite sits beside the controls', async ($, o
   expect(await ui.find({ key: 'play' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Nothing queued/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('/clear keeps the music playing and the playlist loaded', async ($, on) => {
+  const { clock, sent, reads } = fakeMpv(on, { ipcWorks: true })
+  // The engine's own end step, beneath the plugin.
+  on('session.end', async () => ({ sessionId: 'old' }))
+  const music = runMusic($)
+  expect(await music('play')).toBe('Playing track 1.')
+  await clock.advance(10)
+  const before = reads.count
+
+  await $.session.end({ reason: 'clear', sessionId: 'old', resume: { id: 'old' } } as never)
+  // The playlist was read again for the new session, and mpv was not stopped.
+  expect(reads.count > before).toBe(true)
+  expect(sent.some(s => s.includes('rm'))).toBe(false)
+  expect(await music('pause')).toBe('Paused at 00:03.')
+  expect(await music('stop')).toBe('Stopped.')
 })
