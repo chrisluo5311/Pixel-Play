@@ -23,6 +23,13 @@ const FRAME_MS = 250
 const INLINE_ROWS = 12
 // Docked, the rows under the sprite that must stay in view: a gap, title, bar, equalizer, two button rows.
 const CONTROL_ROWS = 7
+// Docked, the tracks kept in view under the controls; a longer playlist scrolls.
+const PLAYLIST_TRACKS = 5
+
+/** Rows the playlist needs in view: a gap, its heading, and up to PLAYLIST_TRACKS tracks (or the empty note). */
+function playlistRows(tracks: number): number {
+  return 2 + Math.max(1, Math.min(tracks, PLAYLIST_TRACKS))
+}
 
 const STOPPED: Player = { status: 'stopped', index: 0, title: '', position: -1, duration: -1 }
 const failed = (index: number, message: string): Player => ({ ...STOPPED, index, status: 'error', message })
@@ -147,7 +154,7 @@ export const register: Register = on => {
     const icon = { stopped: '■', loading: '…', playing: '▶', paused: '⏸', error: '!' }[p.status]
 
     // Inline, the sprite goes at half size to the left; docked, it sits on top and
-    // shrinks on a short terminal so the controls stay in view.
+    // shrinks on a short terminal so the controls and the playlist stay in view.
     const art = sprite && (
       <PixelArt
         Box={Box}
@@ -155,7 +162,7 @@ export const register: Register = on => {
         sprite={sprite}
         frame={isPlaying ? tick : 0}
         maxColumns={inline ? 20 : width}
-        maxRows={inline ? 10 : Math.max(6, e.props.scroll.bodyRows - CONTROL_ROWS)}
+        maxRows={inline ? 10 : e.props.scroll.bodyRows - CONTROL_ROWS - playlistRows(list.length)}
       />
     )
     const controlsWidth = inline ? Math.max(20, width - 22) : width

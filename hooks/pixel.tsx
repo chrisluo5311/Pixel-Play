@@ -3,7 +3,7 @@
 
 import type { Elements } from 'claude-code'
 
-import { ALPHABET } from './skins.gen'
+import { ALPHABET, SKINS } from './skins.gen'
 
 export type Sprite = {
   id: string
@@ -32,9 +32,10 @@ function cell(top?: string, bottom?: string): Cell {
   return { glyph: '▀', color: top, backgroundColor: bottom }
 }
 
-// The opaque bounding box across every frame, so empty margins cost no rows.
-const boxes = new Map<string, { x0: number; y0: number; x1: number; y1: number }>()
-function boxOf(sprite: Sprite) {
+// The opaque bounding box across every frame, so empty margins are dropped.
+type Bounds = { x0: number; y0: number; x1: number; y1: number }
+const boxes = new Map<string, Bounds>()
+function boxOf(sprite: Sprite): Bounds {
   const known = boxes.get(sprite.id)
   if (known) return known
   let [x0, y0, x1, y1] = [sprite.width, sprite.height, -1, -1]
@@ -54,19 +55,51 @@ function boxOf(sprite: Sprite) {
   return box
 }
 
+/**
+ * Pixels per side of the square every skin is fitted into at most, so switching
+ * never resizes the pane; kept small so the playlist has room under it.
+ */
+export const ART_SIZE = 24
+/** The smallest square, however little room there is. */
+const MIN_ART_SIZE = 8
+
+// The widest and tallest box among the skins: every skin is scaled by what fits
+// these into the square, so pixels come out the same size and skins keep the
+// size they were drawn at relative to each other.
+let largest: { w: number; h: number } | undefined
+function largestOf(sprite: Sprite) {
+  largest ??= SKINS.map(boxOf).reduce((m, b) => ({ w: Math.max(m.w, b.x1 - b.x0 + 1), h: Math.max(m.h, b.y1 - b.y0 + 1) }), { w: 1, h: 1 })
+  const box = boxOf(sprite)
+  return { w: Math.max(largest.w, box.x1 - box.x0 + 1), h: Math.max(largest.h, box.y1 - box.y0 + 1) }
+}
+
 /** Cell rows for one frame, each row as runs of identical cells. */
 export function rasterize(sprite: Sprite, frameIndex: number, maxColumns: number, maxRows = Infinity) {
   const frame = sprite.frames[frameIndex % sprite.frames.length] ?? ''
   const box = boxOf(sprite)
   const w = box.x1 - box.x0 + 1
   const h = box.y1 - box.y0 + 1
-  // Halve the picture when the pane is too narrow or too short for it.
-  const step = w > maxColumns || Math.ceil(h / 2) > maxRows ? 2 : 1
+  // The largest even square that fits the room given (two pixels per row).
+  const room = Math.min(ART_SIZE, maxColumns, maxRows * 2)
+  const size = Math.max(MIN_ART_SIZE, room - (room % 2))
+  // One scale for every skin (never enlarging), nearest neighbour, centred in the square.
+  const big = largestOf(sprite)
+  const scale = Math.min(1, size / big.w, size / big.h)
+  const outW = Math.max(1, Math.round(w * scale))
+  const outH = Math.max(1, Math.round(h * scale))
+  const left = Math.floor((size - outW) / 2)
+  const top = Math.floor((size - outH) / 2)
+  const at = (cx: number, cy: number) => {
+    const ox = cx - left
+    const oy = cy - top
+    if (ox < 0 || oy < 0 || ox >= outW || oy >= outH) return undefined
+    return pixel(sprite, frame, box.x0 + Math.floor((ox * w) / outW), box.y0 + Math.floor((oy * h) / outH))
+  }
   const rows: Array<Array<Cell & { text: string }>> = []
-  for (let y = box.y0; y <= box.y1; y += 2 * step) {
+  for (let cy = 0; cy < size; cy += 2) {
     const runs: Array<Cell & { text: string }> = []
-    for (let x = box.x0; x <= box.x1; x += step) {
-      const c = cell(pixel(sprite, frame, x, y), pixel(sprite, frame, x, y + step))
+    for (let cx = 0; cx < size; cx++) {
+      const c = cell(at(cx, cy), at(cx, cy + 1))
       const last = runs[runs.length - 1]
       if (last && last.color === c.color && last.backgroundColor === c.backgroundColor && last.glyph === c.glyph) {
         last.text += c.glyph

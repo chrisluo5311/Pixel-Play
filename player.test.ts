@@ -62,7 +62,7 @@ test('the dock asks for a share of the terminal, within bounds', () => {
   expect(dockColumns(80)).toBe(30)
 })
 
-test('a short pane halves the sprite', () => {
+test('a short pane shrinks the sprite', () => {
   for (const sprite of SKINS) {
     expect(rasterize(sprite, 0, 40, 10).length <= 10).toBe(true)
     for (const runs of rasterize(sprite, 0, 40, 10)) expect(runs.reduce((n, r) => n + r.text.length, 0) <= 20).toBe(true)
@@ -92,7 +92,7 @@ test('every skin rasterizes into half-block rows within the width', () => {
     expect(sprite.frames.length).toBe(5)
     for (let f = 0; f < sprite.frames.length; f++) {
       const rows = rasterize(sprite, f, 40)
-      expect(rows.length <= 20).toBe(true)
+      expect(rows.length).toBe(12)
       for (const runs of rows) {
         expect(runs.reduce((n, r) => n + r.text.length, 0) <= 40).toBe(true)
       }
@@ -101,6 +101,21 @@ test('every skin rasterizes into half-block rows within the width', () => {
     const narrow = rasterize(sprite, 0, 20)
     for (const runs of narrow) expect(runs.reduce((n, r) => n + r.text.length, 0) <= 20).toBe(true)
   }
+})
+
+test('every skin is scaled alike, so a small drawing stays smaller than a big one', () => {
+  // Columns and rows that hold any pixel, as drawn in the 24-pixel square.
+  const extent = (id: string) => {
+    const rows = rasterize(SKINS.find(s => s.id === id)!, 0, 40).map(runs => runs.map(r => r.text).join(''))
+    const used = rows.filter(row => row.trim())
+    const left = Math.min(...used.map(row => row.search(/\S/)))
+    const right = Math.max(...used.map(row => row.trimEnd().length))
+    return { columns: right - left, rows: used.length }
+  }
+  // handheld is drawn 24 pixels wide and rainy-window 40; cassette 23 tall and rainy-window 40.
+  expect(extent('rainy-window').columns).toBe(24)
+  expect(extent('handheld').columns < 18).toBe(true)
+  expect(extent('cassette').rows < 10).toBe(true)
 })
 
 test('/music skin switches and remembers the skin', async ($, on) => {
@@ -322,11 +337,14 @@ test('the skin is picked from a menu in the pane', async ($, on) => {
   await ui.unmount()
 })
 
-test('a docked pane keeps the full-size sprite while the controls fit under it', async ($, on) => {
+test('a docked pane shrinks the sprite to keep the controls and playlist in view', async ($, on) => {
   mock.store(on)
-  for (const [bodyRows, full] of [
-    [25, true],
-    [18, false],
+  // The playlist is empty: a gap, its heading and the empty note take 3 rows, the controls 7.
+  for (const [bodyRows, spriteRows] of [
+    [40, 12],
+    [22, 12],
+    [18, 8],
+    [10, 4],
   ] as const) {
     const ui = await $.ui.mount({
       plugin: 'pixel-player',
@@ -335,9 +353,27 @@ test('a docked pane keeps the full-size sprite while the controls fit under it',
       requestId: 'pixel-player',
       props: { title: '♪', isFocused: false, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
     })
-    // vinyl is 29 pixels tall: 15 rows full size, 8 halved.
+    // Truncated texts: the sprite's rows plus the title and the progress bar.
     const rows = JSON.stringify(await ui.find({ type: 'Box' })).split('"wrap":"truncate"').length - 1
-    expect(rows >= 15).toBe(full)
+    expect(rows - 2).toBe(spriteRows)
     await ui.unmount()
   }
+})
+
+test('every skin takes the same rows, so switching never resizes the pane', async ($, on) => {
+  mock.store(on)
+  const ui = await $.ui.mount({
+    plugin: 'pixel-player',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'pixel-player',
+    props: { title: '♪', isFocused: true, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+  })
+  const counts = new Set<number>()
+  for (const value of ['vinyl', 'cat', 'cassette', 'boombox', 'rainy-window']) {
+    await $.ui.select({ plugin: 'pixel-player', key: 'skin', value })
+    counts.add(JSON.stringify(await ui.find({ type: 'Box' })).split('"wrap":"truncate"').length - 1)
+  }
+  expect(counts.size).toBe(1)
+  await ui.unmount()
 })
