@@ -6,7 +6,6 @@
 [![Version][version-shield]][version-url]
 [![License][license-shield]][license-url]
 [![Made for Claude Code][made-for-shield]][made-for-url]
-[![Platform][platform-shield]][platform-url]
 [![Views][views-shield]][views-url]
 
 <br />
@@ -189,10 +188,10 @@ Anything mpv can open works: YouTube and other sites yt-dlp supports, direct aud
 
 ### Skins
 
-Ten animated skins, generated with [PixelLab](https://pixellab.ai):
+Ten animated skins, generated with [PixelLab](https://pixellab.ai). Switch with `/music skin <name or number>` or the `skin:` menu in the pane.
 
 <p align="center">
-  <code>vinyl</code> · <code>headphone-kid</code> · <code>cat</code> · <code>cassette</code> · <code>anime-girl</code> · <code>handheld</code> · <code>shiba-dj</code> · <code>boombox</code> · <code>rainy-window</code> · <code>penguin</code>
+  <img src="assets/demo/skins.gif" alt="The ten Pixel Play skins: vinyl, headphone-kid, cat, cassette, anime-girl, handheld, shiba-dj, boombox, rainy-window, penguin" width="100%">
 </p>
 
 The source PNGs live in [`assets/`](assets). To add or change a skin:
@@ -277,8 +276,6 @@ Project link: [https://github.com/chrisluo5311/Pixel-Play](https://github.com/ch
 [license-url]: LICENSE
 [made-for-shield]: https://img.shields.io/badge/made%20for-Claude%20Code-d97757?style=for-the-badge&logo=claude&logoColor=white
 [made-for-url]: https://claude.com/claude-code
-[platform-shield]: https://img.shields.io/badge/platform-macOS-555555?style=for-the-badge&logo=apple&logoColor=white
-[platform-url]: #prerequisites
 [views-shield]: https://hits.sh/github.com/chrisluo5311/Pixel-Play.svg?style=for-the-badge&label=views&color=e8478b
 [views-url]: https://hits.sh/github.com/chrisluo5311/Pixel-Play/
 [typescript-shield]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
