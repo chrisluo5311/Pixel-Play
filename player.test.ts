@@ -314,8 +314,30 @@ test('the skin is picked from a menu in the pane', async ($, on) => {
   })
   const menu = await ui.find({ key: 'skin' })
   expect(menu?.type).toBe('Select')
+  // The Select draws its own colon after the label.
+  expect((menu?.props as { label: string }).label).toBe('skin')
   expect((menu?.props as { options: unknown[] }).options.length).toBe(10)
   await $.ui.select({ plugin: 'pixel-player', key: 'skin', value: 'penguin' })
   expect(((await ui.find({ key: 'skin' }))?.props as { value: string }).value).toBe('penguin')
   await ui.unmount()
+})
+
+test('a docked pane keeps the full-size sprite while the controls fit under it', async ($, on) => {
+  mock.store(on)
+  for (const [bodyRows, full] of [
+    [25, true],
+    [18, false],
+  ] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'pixel-player',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'pixel-player',
+      props: { title: '♪', isFocused: false, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
+    })
+    // vinyl is 29 pixels tall: 15 rows full size, 8 halved.
+    const rows = JSON.stringify(await ui.find({ type: 'Box' })).split('"wrap":"truncate"').length - 1
+    expect(rows >= 15).toBe(full)
+    await ui.unmount()
+  }
 })

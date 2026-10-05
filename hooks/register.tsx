@@ -21,6 +21,8 @@ const PANE = 'pixel-player'
 const FRAME_MS = 250
 // Inline above the prompt: a half-size sprite beside the controls fits in this many rows.
 const INLINE_ROWS = 12
+// Docked, the rows under the sprite that must stay in view: a gap, title, bar, equalizer, two button rows.
+const CONTROL_ROWS = 7
 
 const STOPPED: Player = { status: 'stopped', index: 0, title: '', position: -1, duration: -1 }
 const failed = (index: number, message: string): Player => ({ ...STOPPED, index, status: 'error', message })
@@ -153,7 +155,7 @@ export const register: Register = on => {
         sprite={sprite}
         frame={isPlaying ? tick : 0}
         maxColumns={inline ? 20 : width}
-        maxRows={inline ? 10 : Math.max(6, e.props.scroll.bodyRows - 12)}
+        maxRows={inline ? 10 : Math.max(6, e.props.scroll.bodyRows - CONTROL_ROWS)}
       />
     )
     const controlsWidth = inline ? Math.max(20, width - 22) : width
@@ -193,7 +195,7 @@ export const register: Register = on => {
           {Select ? (
             <Select
               key="skin"
-              label="skin:"
+              label="skin"
               options={SKINS.map(s => ({ value: s.id }))}
               value={sprite?.id}
               onSelect={id => void cycleSkin($, id)}
