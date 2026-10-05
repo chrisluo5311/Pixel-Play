@@ -279,14 +279,24 @@ test('inline above the prompt, the sprite sits beside the controls', async ($, o
 
 test('/clear keeps the music playing and the playlist loaded', async ($, on) => {
   const { clock, sent, reads } = fakeMpv(on, { ipcWorks: true })
-  // The engine's own end step, beneath the plugin.
+  // The engine's end step, beneath the plugin: after it the process goes on as 'new',
+  // though the first check still sees the old id.
+  let id = 'old'
+  let idChecks = 0
   on('session.end', async () => ({ sessionId: 'old' }))
+  on('session.id', async () => ({ value: ++idChecks > 1 ? id : 'old' }))
   const music = runMusic($)
   expect(await music('play')).toBe('Playing track 1.')
   await clock.advance(10)
   const before = reads.count
 
   await $.session.end({ reason: 'clear', sessionId: 'old', resume: { id: 'old' } } as never)
+  id = 'new'
+  // Nothing is written until the new session has taken over.
+  expect(reads.count).toBe(before)
+  await clock.advance(50)
+  expect(reads.count).toBe(before)
+  await clock.advance(200)
   // The playlist was read again for the new session, and mpv was not stopped.
   expect(reads.count > before).toBe(true)
   expect(sent.some(s => s.includes('rm'))).toBe(false)

@@ -234,16 +234,30 @@ export const register: Register = on => {
   on('session.end', async ($, e, next) => {
     if (e.reason === 'clear') {
       // /clear goes on under a new session whose state starts empty, and no
-      // session.start fires for it: keep the music and carry the state over.
-      const p = await read($, player)
+      // session.start fires for it: keep the music and carry the state over
+      // once the new session is in place (a write before then is wiped).
+      const carried = await read($, player)
       const ended = await next(e)
-      await restoreState($)
-      await update($, player, () => p)
+      carryOver($, e.sessionId, carried, 0)
       return ended
     }
     await stop($)
     if (socket) await $.process.run(['/bin/rm', '-f', socket]).catch(() => undefined)
     return next(e)
+  })
+}
+
+/** Refills the state once the session after a /clear has taken over; retries for about 5 s. */
+function carryOver($: $, endedId: string, carried: Player, tries: number): void {
+  $.clock.after(tries === 0 ? 50 : 200, () => {
+    void (async () => {
+      const id = await $.session.id().catch(() => endedId)
+      if (id === endedId && tries < 25) return carryOver($, endedId, carried, tries + 1)
+      await restoreState($)
+      // A running track reports its own progress; a stopped one is put back as it was.
+      const now = await read($, player)
+      if (now.status === 'stopped' && now.title === '' && now.index === 0) await update($, player, () => carried)
+    })()
   })
 }
 
