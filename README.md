@@ -79,7 +79,7 @@ Pixel Play keeps music one keystroke away while you work. It docks as a pane bes
 
 * **Lives inside Claude Code.** A `/music` command and a docked pane, no extra window or app.
 * **Streams instead of downloading.** YouTube links play through [mpv](https://mpv.io) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) without fetching the whole file first.
-* **Ten animated skins.** Each one is drawn with half-block characters (`▀`), two pixels per terminal cell.
+* **Twelve animated skins, including animal memes.** Each one is drawn with half-block characters (`▀`), two pixels per terminal cell.
 * **Point and click.** Click a track to play it, click the buttons, or use single-key hotkeys.
 * **Your playlist survives updates.** It lives in `~/.claude/pixel-play/`, outside the plugin folder.
 
@@ -188,10 +188,10 @@ Anything mpv can open works: YouTube and other sites yt-dlp supports, direct aud
 
 ### Skins
 
-Ten animated skins, generated with [PixelLab](https://pixellab.ai). Switch with `/music skin <name or number>` or the `skin:` menu in the pane.
+Twelve animated skins (doge and pop-cat are the animal-meme ones), generated with [PixelLab](https://pixellab.ai). Switch with `/music skin <name or number>` or the `skin:` menu in the pane.
 
 <p align="center">
-  <img src="assets/demo/skins.gif" alt="The ten Pixel Play skins: vinyl, headphone-kid, cat, cassette, anime-girl, handheld, shiba-dj, boombox, rainy-window, penguin" width="100%">
+  <img src="assets/demo/skins.gif" alt="The twelve Pixel Play skins: vinyl, headphone-kid, cat, cassette, anime-girl, handheld, shiba-dj, boombox, rainy-window, penguin, doge, pop-cat" width="100%">
 </p>
 
 The source PNGs live in [`assets/`](assets). To add or change a skin:
@@ -231,7 +231,7 @@ claude --plugin-dir .      # run Claude Code with this checkout; /reload-plugins
 - [x] Docked pane with an animated pixel-art sprite
 - [x] YouTube streaming through mpv and yt-dlp
 - [x] Pause and resume over mpv's IPC socket
-- [x] Ten skins with a picker menu
+- [x] Twelve skins with a picker menu
 - [ ] Live volume control (today the volume applies from the next track on)
 - [ ] An equalizer driven by the audio (today it is decorative)
 - [ ] Tested support for Linux and Windows
