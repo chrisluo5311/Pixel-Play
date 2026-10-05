@@ -1,6 +1,6 @@
 {
   "name": "pixel-player",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "A pixel-art music player pane that streams a playlist through mpv",
   "author": {
     "name": "chrisluo5311"

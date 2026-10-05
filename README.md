@@ -23,7 +23,7 @@ It is a Claude Code mod (a plugin of function hooks). Playback goes through [mpv
 - macOS (other systems should work wherever mpv runs, but are untested)
 - `brew install mpv yt-dlp`
 - A terminal with truecolor (iTerm2, Ghostty, kitty, WezTerm, ...)
-- For the side-by-side layout: Claude Code's fullscreen layout and a terminal at least 110 columns wide. Otherwise the pane opens above the prompt.
+- For the side-by-side layout: Claude Code's fullscreen layout and a terminal at least 110 columns wide. Claude Code decides this, not the mod: below 110 columns the pane opens above the prompt, where the player switches to a compact layout (small sprite beside the controls). Docked, it asks for about 30% of the terminal's width (30 to 44 columns) and shrinks the sprite on short windows. Drag the dock's edge to override the width.
 
 ## Install
 

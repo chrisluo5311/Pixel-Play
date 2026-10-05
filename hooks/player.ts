@@ -37,6 +37,11 @@ export function ipcSucceeded(reply: string): boolean {
   return lines.length > 0 && lines.every(l => l.includes('"error":"success"'))
 }
 
+/** The dock width to ask for: a share of the terminal, room for a full-size sprite on wide ones. */
+export function dockColumns(terminalColumns: number): number {
+  return Math.max(30, Math.min(44, Math.round(terminalColumns * 0.3)))
+}
+
 export function formatTime(seconds: number): string {
   if (!(seconds >= 0)) return '--:--'
   const s = Math.floor(seconds)

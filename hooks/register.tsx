@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Player, Track } from '../types'
 import { PixelArt } from './pixel'
 import {
+  dockColumns,
   equalizer,
   formatTime,
   ipcCommand,
@@ -18,6 +19,8 @@ import { SKINS } from './skins.gen'
 
 const PANE = 'pixel-player'
 const FRAME_MS = 250
+// Inline above the prompt: a half-size sprite beside the controls fits in this many rows.
+const INLINE_ROWS = 12
 
 const STOPPED: Player = { status: 'stopped', index: 0, title: '', position: -1, duration: -1 }
 const failed = (index: number, message: string): Player => ({ ...STOPPED, index, status: 'error', message })
@@ -73,7 +76,7 @@ export const register: Register = on => {
 
     switch (verb.toLowerCase()) {
       case '':
-        await $.ui.open({ id: PANE, title: '♪ Pixel Player' })
+        await openPane($, e.presentation.columns)
         return { text: 'Pixel Player opened. /music help lists the commands.' }
       case 'help':
         return { text: HELP }
@@ -83,7 +86,7 @@ export const register: Register = on => {
         if (list.length === 0) return { text: emptyPlaylist() }
         const n = arg ? Number(arg) - 1 : (await read($, player)).index
         void play($, Number.isInteger(n) && n >= 0 && n < list.length ? n : 0)
-        await $.ui.open({ id: PANE, title: '♪ Pixel Player' })
+        await openPane($, e.presentation.columns)
         return { text: `Playing track ${(Number.isInteger(n) && n >= 0 && n < list.length ? n : 0) + 1}.` }
       }
       case 'pause':
@@ -132,6 +135,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const width = Math.max(20, e.props.bodyColumns)
+    const inline = e.props.placement === 'inline'
     const p = await read($, player)
     const list = await read($, playlist)
     const skinId = await read($, skin)
@@ -141,50 +145,59 @@ export const register: Register = on => {
     const isPlaying = p.status === 'playing'
     const title = p.title || trackLabel(list[p.index], titles) || 'Nothing queued'
     const icon = { stopped: '■', loading: '…', playing: '▶', paused: '⏸', error: '!' }[p.status]
-    const barWidth = Math.max(4, width - 16)
 
-    return (
-      <Box flexDirection="column">
-        {/* The player is centered under the picture; the playlist reads from the left. */}
-        <Box flexDirection="column" alignItems="center">
-          {sprite && (
-            <PixelArt Box={Box} Text={Text} sprite={sprite} frame={isPlaying ? tick : 0} maxColumns={width} />
-          )}
-          <Text> </Text>
-          <Text bold wrap="truncate">
-            {icon} {title}
+    // Inline, the sprite goes at half size to the left; docked, it sits on top and
+    // shrinks on a short terminal so the controls stay in view.
+    const art = sprite && (
+      <PixelArt
+        Box={Box}
+        Text={Text}
+        sprite={sprite}
+        frame={isPlaying ? tick : 0}
+        maxColumns={inline ? 20 : width}
+        maxRows={inline ? 10 : Math.max(6, e.props.scroll.bodyRows - 12)}
+      />
+    )
+    const controlsWidth = inline ? Math.max(20, width - 22) : width
+    const align = inline ? 'flex-start' : 'center'
+    const controls = (
+      <Box flexDirection="column" alignItems={align} flexGrow={1}>
+        <Text bold wrap="truncate">
+          {icon} {title}
+        </Text>
+        <Text wrap="truncate">
+          <Text color="cyan">{progressBar(p.position, p.duration, Math.max(4, controlsWidth - 16))}</Text>{' '}
+          <Text dimColor>
+            {formatTime(p.position)}/{formatTime(p.duration)}
           </Text>
-          <Text wrap="truncate">
-            <Text color="cyan">{progressBar(p.position, p.duration, barWidth)}</Text>{' '}
-            <Text dimColor>
-              {formatTime(p.position)}/{formatTime(p.duration)}
-            </Text>
+        </Text>
+        <Text color="magenta">{equalizer(tick, Math.min(controlsWidth, 24), isPlaying)}</Text>
+        {p.status === 'error' && p.message && (
+          <Text color="red" wrap="truncate">
+            {p.message}
           </Text>
-          <Text color="magenta">{equalizer(tick, Math.min(width, 24), isPlaying)}</Text>
-          {p.status === 'error' && p.message && (
-            <Text color="red" wrap="truncate">
-              {p.message}
-            </Text>
-          )}
-          <Box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
-            <Button key="prev" hotkey="b" label="⏮" onPress={() => step($, -1)} />
-            <Button
-              key="play"
-              hotkey="p"
-              label={isPlaying ? '⏸' : '▶'}
-              onPress={() => (isPlaying ? pause($) : p.status === 'paused' ? resume($) : play($, p.index))}
-            />
-            <Button key="stop" hotkey="s" label="■" onPress={() => stop($)} />
-            <Button key="next" hotkey="n" label="⏭" onPress={() => step($, 1)} />
-          </Box>
-          <Box flexDirection="row" flexWrap="wrap" justifyContent="center" gap={1}>
-            <Button key="voldown" hotkey="d" label="vol-" dimColor onPress={() => setVolume($, vol - 10)} />
-            <Text dimColor>{vol}</Text>
-            <Button key="volup" hotkey="u" label="vol+" dimColor onPress={() => setVolume($, vol + 10)} />
-            <Button key="skin" hotkey="k" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
-          </Box>
+        )}
+        <Box flexDirection="row" flexWrap="wrap" justifyContent={align} gap={1}>
+          <Button key="prev" hotkey="b" label="⏮" onPress={() => step($, -1)} />
+          <Button
+            key="play"
+            hotkey="p"
+            label={isPlaying ? '⏸' : '▶'}
+            onPress={() => (isPlaying ? pause($) : p.status === 'paused' ? resume($) : play($, p.index))}
+          />
+          <Button key="stop" hotkey="s" label="■" onPress={() => stop($)} />
+          <Button key="next" hotkey="n" label="⏭" onPress={() => step($, 1)} />
         </Box>
-        <Text> </Text>
+        <Box flexDirection="row" flexWrap="wrap" justifyContent={align} gap={1}>
+          <Button key="voldown" hotkey="d" label="vol-" dimColor onPress={() => setVolume($, vol - 10)} />
+          <Text dimColor>{vol}</Text>
+          <Button key="volup" hotkey="u" label="vol+" dimColor onPress={() => setVolume($, vol + 10)} />
+          <Button key="skin" hotkey="k" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
+        </Box>
+      </Box>
+    )
+    const tracks = (
+      <Box flexDirection="column">
         <Text dimColor>─ Playlist ({list.length}) ─</Text>
         {list.length === 0 && <Text dimColor>Empty. /music add &lt;youtube link&gt;</Text>}
         {/* One cell short of the edge: a wide character in the last column wraps on some terminals. */}
@@ -199,6 +212,28 @@ export const register: Register = on => {
         ))}
       </Box>
     )
+
+    if (inline) {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" gap={2}>
+            {art}
+            {controls}
+          </Box>
+          <Text> </Text>
+          {tracks}
+        </Box>
+      )
+    }
+    return (
+      <Box flexDirection="column">
+        {art}
+        <Text> </Text>
+        {controls}
+        <Text> </Text>
+        {tracks}
+      </Box>
+    )
   })
 
   on('session.end', async ($, e, next) => {
@@ -206,6 +241,11 @@ export const register: Register = on => {
     if (socket) await $.process.run(['/bin/rm', '-f', socket]).catch(() => undefined)
     return next(e)
   })
+}
+
+// Asks for a dock sized to the terminal, and a short block when it sits inline above the prompt.
+async function openPane($: $, terminalColumns: number): Promise<void> {
+  await $.ui.open({ id: PANE, title: '♪ Pixel Player', columns: dockColumns(terminalColumns), rows: INLINE_ROWS })
 }
 
 // Kept outside the plugin folder: an installed plugin's folder is a copy that an update replaces.

@@ -55,12 +55,13 @@ function boxOf(sprite: Sprite) {
 }
 
 /** Cell rows for one frame, each row as runs of identical cells. */
-export function rasterize(sprite: Sprite, frameIndex: number, maxColumns: number) {
+export function rasterize(sprite: Sprite, frameIndex: number, maxColumns: number, maxRows = Infinity) {
   const frame = sprite.frames[frameIndex % sprite.frames.length] ?? ''
   const box = boxOf(sprite)
   const w = box.x1 - box.x0 + 1
-  // Halve the picture when the pane is too narrow for it.
-  const step = w > maxColumns ? 2 : 1
+  const h = box.y1 - box.y0 + 1
+  // Halve the picture when the pane is too narrow or too short for it.
+  const step = w > maxColumns || Math.ceil(h / 2) > maxRows ? 2 : 1
   const rows: Array<Array<Cell & { text: string }>> = []
   for (let y = box.y0; y <= box.y1; y += 2 * step) {
     const runs: Array<Cell & { text: string }> = []
@@ -84,11 +85,12 @@ export function PixelArt(props: {
   sprite: Sprite
   frame: number
   maxColumns: number
+  maxRows?: number
 }) {
-  const { Text, Box, sprite, frame, maxColumns } = props
+  const { Text, Box, sprite, frame, maxColumns, maxRows } = props
   return (
-    <Box flexDirection="column" alignItems="center">
-      {rasterize(sprite, frame, maxColumns).map(runs => (
+    <Box flexDirection="column" alignItems="center" flexShrink={0}>
+      {rasterize(sprite, frame, maxColumns, maxRows).map(runs => (
         <Text wrap="truncate">
           {runs.map(run =>
             run.color ? (

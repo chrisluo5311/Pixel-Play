@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import {
   displayWidth,
+  dockColumns,
   equalizer,
   formatTime,
   ipcCommand,
@@ -52,6 +53,20 @@ test('labels are cut by terminal cells, wide characters counting two', () => {
   // A wide character that would straddle the edge is dropped whole.
   expect(truncateToWidth('戀如雨止', 4)).toBe('戀…')
   expect(truncateToWidth('abc', 3)).toBe('abc')
+})
+
+test('the dock asks for a share of the terminal, within bounds', () => {
+  expect(dockColumns(110)).toBe(33)
+  expect(dockColumns(130)).toBe(39)
+  expect(dockColumns(200)).toBe(44)
+  expect(dockColumns(80)).toBe(30)
+})
+
+test('a short pane halves the sprite', () => {
+  for (const sprite of SKINS) {
+    expect(rasterize(sprite, 0, 40, 10).length <= 10).toBe(true)
+    for (const runs of rasterize(sprite, 0, 40, 10)) expect(runs.reduce((n, r) => n + r.text.length, 0) <= 20).toBe(true)
+  }
 })
 
 test('mpv IPC lines and replies', () => {
@@ -220,4 +235,40 @@ test('/music pause says so when mpv cannot be reached', async ($, on) => {
   await clock.advance(10)
   expect(await music('pause')).toBe('Could not reach mpv to pause.')
   expect(await music('stop')).toBe('Stopped.')
+})
+
+test('/music opens a dock sized to the terminal', async ($, on) => {
+  mock.store(on)
+  mock.env(on, { HOME: '/home/me' })
+  const opened: unknown[] = []
+  on('ui.open', async ($, e) => {
+    opened.push(e)
+    return { value: { isPlaced: true } }
+  })
+  on('fs.exists', async () => ({ value: true }))
+  on('fs.read', async () => ({ value: '' }))
+  for (const columns of [120, 200]) {
+    await $.command.run({ command: 'music', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns } })
+  }
+  expect(opened).toEqual([
+    expect.objectContaining({ id: 'pixel-player', columns: 36, rows: 12 }),
+    expect.objectContaining({ id: 'pixel-player', columns: 44, rows: 12 }),
+  ])
+})
+
+test('inline above the prompt, the sprite sits beside the controls', async ($, on) => {
+  mock.store(on)
+  const ui = await $.ui.mount({
+    plugin: 'pixel-player',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'pixel-player',
+    props: { title: '♪', isFocused: false, bodyColumns: 100, placement: 'inline', scroll: { offset: 0, bodyRows: 12 }, view: {} },
+  })
+  const tree = JSON.stringify(await ui.find({ type: 'Box' }))
+  // The first row holds the half-size sprite and the controls together.
+  expect(tree.indexOf('"flexDirection":"row","gap":2') >= 0).toBe(true)
+  expect(await ui.find({ key: 'play' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Nothing queued/ })).toBeDefined()
+  await ui.unmount()
 })
