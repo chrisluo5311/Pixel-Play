@@ -63,7 +63,7 @@ Your playlist lives in `~/.claude/pixel-play/playlist.txt`, outside the plugin f
 | `/music skin [name or number]` | Switch skin (no argument: next skin) |
 | `/music vol <0-100>` | Set the volume |
 
-With the pane focused: `p` play / pause / resume, `s` stop, `n` next, `b` previous, `k` next skin, `u` / `d` volume up / down. Click a track in the playlist to play it.
+With the pane focused: `p` play / pause / resume, `s` stop, `n` next, `b` previous, `u` / `d` volume up / down. Click a track in the playlist to play it, and pick a skin from the `skin:` menu (arrows to move, Enter to choose).
 
 ## Playlist format
 

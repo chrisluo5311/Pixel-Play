@@ -128,7 +128,10 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const elements = $.ui.resolve(e)
+    const { Box, Text, Button } = elements
+    // A picker where the surface draws one (all but mobile); else a button that cycles.
+    const Select = 'Select' in elements ? elements.Select : undefined
     const width = Math.max(20, e.props.bodyColumns)
     const inline = e.props.placement === 'inline'
     const p = await read($, player)
@@ -187,7 +190,17 @@ export const register: Register = on => {
           <Button key="voldown" hotkey="d" label="vol-" dimColor onPress={() => setVolume($, vol - 10)} />
           <Text dimColor>{vol}</Text>
           <Button key="volup" hotkey="u" label="vol+" dimColor onPress={() => setVolume($, vol + 10)} />
-          <Button key="skin" hotkey="k" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
+          {Select ? (
+            <Select
+              key="skin"
+              label="skin:"
+              options={SKINS.map(s => ({ value: s.id }))}
+              value={sprite?.id}
+              onSelect={id => void cycleSkin($, id)}
+            />
+          ) : (
+            <Button key="skin" label={`skin: ${sprite?.id ?? '-'}`} dimColor onPress={() => cycleSkin($, '')} />
+          )}
         </Box>
       </Box>
     )

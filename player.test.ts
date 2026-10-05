@@ -302,3 +302,20 @@ test('/clear keeps the music playing and the playlist loaded', async ($, on) => 
   expect(await music('pause')).toBe('Paused at 00:03.')
   expect(await music('stop')).toBe('Stopped.')
 })
+
+test('the skin is picked from a menu in the pane', async ($, on) => {
+  mock.store(on)
+  const ui = await $.ui.mount({
+    plugin: 'pixel-player',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'pixel-player',
+    props: { title: '♪', isFocused: true, bodyColumns: 44, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+  })
+  const menu = await ui.find({ key: 'skin' })
+  expect(menu?.type).toBe('Select')
+  expect((menu?.props as { options: unknown[] }).options.length).toBe(10)
+  await $.ui.select({ plugin: 'pixel-player', key: 'skin', value: 'penguin' })
+  expect(((await ui.find({ key: 'skin' }))?.props as { value: string }).value).toBe('penguin')
+  await ui.unmount()
+})
