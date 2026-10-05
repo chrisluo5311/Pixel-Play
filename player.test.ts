@@ -153,7 +153,6 @@ function fakeMpv(on: Parameters<Parameters<typeof test>[1]>[1], options: { ipcWo
   const reads = { count: 0 }
   let paused = 0
   on('ui.open', async () => ({ value: undefined }))
-  on('ui.status', async () => ({ value: undefined }))
   on('fs.exists', async () => ({ value: true }))
   on('fs.read', async () => {
     reads.count++

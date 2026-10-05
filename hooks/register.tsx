@@ -325,7 +325,6 @@ async function play($: $, index: number): Promise<void> {
   socket = await socketPath($)
   const vol = await read($, volume)
   await update($, player, () => ({ status: 'loading', index, title: trackLabel(track, titles), position: -1, duration: -1 }))
-  $.ui.status(`♪ ${trackLabel(track, titles)}`)
   startTicker($)
 
   const argv = [
@@ -355,7 +354,6 @@ async function play($: $, index: number): Promise<void> {
       if (progress.title && !progress.title.startsWith('watch?') && titles[track.url] !== progress.title) {
         titles = { ...titles, [track.url]: progress.title }
         await $.store.set('titles', titles)
-        $.ui.status(`♪ ${progress.title}`)
       }
       await update($, player, () => ({
         status: progress.paused ? 'paused' : 'playing',
@@ -369,7 +367,7 @@ async function play($: $, index: number): Promise<void> {
   } catch (err) {
     if (mine === generation) {
       await update($, player, () => failed(index, String(err).slice(0, 200)))
-      endTicker($)
+      endTicker()
     }
     return
   }
@@ -383,7 +381,7 @@ async function play($: $, index: number): Promise<void> {
   }
   const message = errors.trim().split('\n').pop() || `mpv exited with ${code}`
   await update($, player, () => failed(index, message))
-  endTicker($)
+  endTicker()
 }
 
 /** Ends the child, if any, without touching the state. */
@@ -398,7 +396,7 @@ async function stop($: $): Promise<void> {
   await halt()
   const p = await read($, player)
   await update($, player, () => ({ ...STOPPED, index: p.index, title: p.title }))
-  endTicker($)
+  endTicker()
 }
 
 // Short enough for a Unix socket path (104 bytes on macOS).
@@ -421,8 +419,7 @@ async function pause($: $): Promise<string> {
   if (p.status !== 'playing') return p.status === 'paused' ? 'Already paused.' : 'Nothing is playing.'
   if (!(await mpvCommand($, ['set_property', 'pause', true]))) return 'Could not reach mpv to pause.'
   await update($, player, q => ({ ...q, status: 'paused' }))
-  endTicker($)
-  $.ui.status(`⏸ ${p.title}`)
+  endTicker()
   return `Paused at ${formatTime(p.position)}.`
 }
 
@@ -432,7 +429,6 @@ async function resume($: $): Promise<string> {
   if (!(await mpvCommand($, ['set_property', 'pause', false]))) return 'Could not reach mpv to resume.'
   await update($, player, q => ({ ...q, status: 'playing' }))
   startTicker($)
-  $.ui.status(`♪ ${p.title}`)
   return 'Resumed.'
 }
 
@@ -468,8 +464,7 @@ function startTicker($: $): void {
   ticker = $.clock.every(FRAME_MS, () => update($, frame, n => (n + 1) % 1_000_000))
 }
 
-function endTicker($: $): void {
+function endTicker(): void {
   ticker?.cancel()
   ticker = undefined
-  $.ui.status(undefined)
 }
