@@ -87,7 +87,7 @@ test('time, bar and equalizer formatting', () => {
 })
 
 test('every skin rasterizes into half-block rows within the width', () => {
-  expect(SKINS.length).toBe(10)
+  expect(SKINS.length).toBe(12)
   for (const sprite of SKINS) {
     expect(sprite.frames.length).toBe(5)
     for (let f = 0; f < sprite.frames.length; f++) {
@@ -128,8 +128,8 @@ test('/music skin switches and remembers the skin', async ($, on) => {
       presentation: { isFullscreen: true, columns: 160 },
     })
 
-  expect(await music('skin penguin')).toEqual(expect.objectContaining({ text: 'Skin: penguin' }))
-  // Penguin is the last skin, so the next one wraps around to the first.
+  expect(await music('skin pop-cat')).toEqual(expect.objectContaining({ text: 'Skin: pop-cat' }))
+  // Pop-cat is the last skin, so the next one wraps around to the first.
   expect(await music('skin')).toEqual(expect.objectContaining({ text: 'Skin: vinyl' }))
   expect(await music('skin nope')).toEqual(expect.objectContaining({ text: expect.stringContaining('No skin') }))
   expect(await music('skin 3')).toEqual(expect.objectContaining({ text: 'Skin: cat' }))
@@ -331,7 +331,7 @@ test('the skin is picked from a menu in the pane', async ($, on) => {
   expect(menu?.type).toBe('Select')
   // The Select draws its own colon after the label.
   expect((menu?.props as { label: string }).label).toBe('skin')
-  expect((menu?.props as { options: unknown[] }).options.length).toBe(10)
+  expect((menu?.props as { options: unknown[] }).options.length).toBe(12)
   await $.ui.select({ plugin: 'pixel-player', key: 'skin', value: 'penguin' })
   expect(((await ui.find({ key: 'skin' }))?.props as { value: string }).value).toBe('penguin')
   await ui.unmount()
